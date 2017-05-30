@@ -272,24 +272,36 @@ temp <- as.vector(weatherDF["Max_TemperatureF"])
 qplot(date,temp,aes()) + geom_line()
 ```
 
-Looking at this graph, I would guess the temperatures are stable between middle of June to middle of September.  But to play it safe, we'll designate the "norm" to be July 1st and Sept 1st.  I'm going to collect the 
+Looking at this graph, I would guess the temperatures are stable between middle of June to middle of September.  But to play it safe, we'll designate the "norm" to be July 1st and Sept 1st.  I'm going to collect all the data into a single matrix where the first column is the date and the rest of the columns are the highest temperature during every year.  I've skipped 1996 and 2000 as there have been some corrupt data.
 
 
-```{r,message=FALSE,results="hide"}
+```{r,results="hide"}
 yrAry <- 1997:2015
-AvgSummTemp <- vector()
 for (i in 1:length(yrAry))
 {
+  #set the year for this loop
   yr <- yrAry[i]
+  
+  #skipping year 2000 due to corrupt data
+  if (yr==2000)
+  {next}
+  
+  #concat year with dates for the loop
   startDate <- paste0(yr,"-06-01")
   endDate <- paste0(yr,"-11-1")
-  invisible(weatherTbl <- getWeatherForDate("KFTY",startDate,end_date=endDate))
+  
+  #pull data from wunderground
+  weatherTbl <- getWeatherForDate("KFTY",startDate,end_date=endDate)
   wDF <- data.frame(weatherTbl)
+  
+  #if it's the first value, setup the dataframe
   if (i == 1)
   {
     weatherDF <- wDF[,c('Date','Max_TemperatureF')]
     names(weatherDF)[names(weatherDF)=='Max_TemperatureF'] <- yr
   }
+  
+  #if it's not the first value, bind the columns
   else
   {
     weatherDF <- cbind(weatherDF,wDF['Max_TemperatureF'])
