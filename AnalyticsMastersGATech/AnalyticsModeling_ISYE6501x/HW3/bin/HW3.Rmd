@@ -1,6 +1,9 @@
 ---
 title: "Time Series and Regression"
-output: html_notebook
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
 ---
 
 # Question 1
@@ -30,6 +33,7 @@ library(ggplot2)
 library(reshape2)
 library(qcc)
 library(forecast)
+library(plotly)
 
 tempdf <- read.table('tempYearsCol.txt', header=TRUE)
 ```
@@ -56,7 +60,7 @@ colnames(ary) <- loop
 meltdf <-melt(ary,id="loop")
 meltdf$Var2=as.factor(meltdf$Var2)
 colnames(meltdf) <- c("Var1",  "a",  "value")
-ggplot(meltdf,aes(x=Var1,y=value,color=a,group=a)) + geom_line() + labs(title="Exp Smoothing Decay Across Time Periods", x="Number of Time Periods Back", y="variable weight")
+ggplot(meltdf,aes(x=Var1,y=value,color=a,group=a)) + geom_line() + labs(title="Exp Smoothing Decay Across Time Periods", x="Number of Time Periods Back", y="variable weight")+theme_minimal()
 ```
 From this graph, you can really see that with a low alpha value, the weight given to the latest data point is very low but it only gradually decays from there, taking into account all of the previous time periods.  With a high alpha value, we give the latest data point a very high weight and then quickly decay it down to make previous data points almost negligable.  It seems that 3 time periods back is the elbow joint for many of the high value alpha points.
 
@@ -79,6 +83,7 @@ for (i in 1:length(years))
 One way to determine the best alpha value without going through optimization is to plot the model's sum of squared errors against varying alpha values.  Here it looks like the most optimal alpha value would be 0.2.
 
 ```{r}
+EosTS <- as.ts(EosIndAry)
 errMat <- matrix(NA,9,2)
 for (i in 1:9)
 {
@@ -97,12 +102,108 @@ But being lazy, we can just have the algorithm calculate it for us.
 By not placing an alpha value in the model, it will be optimally calculated and we can see it was pretty close to 0.2.  We see the resulting trend 
 ```{r}
 #Run HoltWinters model and look at trend
-EosTS <- as.ts(EosIndAry)
 hwModel <- HoltWinters(EosTS,beta=TRUE,gamma=FALSE)
 print(paste0("alpha value is: ",hwModel$alpha))
 print(hwModel$fitted)
 ```
 At the current year, the appearance is that the unofficial end of summer is actually getting earlier by a very small amount.  To answer the question, the end of summer has not gotten later over the 20 years.
+```{r}
+dateInd <- round(hwModel$fitted[,1])
+datesVal <- tempdf$DAY[dateInd]
+datesVal <- as.Date(datesVal,format = "%d-%B")
+yearVal <- colnames(tempdf)[4:21]
+yearVal <- as.integer(gsub('X','',yearVal))
+qplot(yearVal,datesVal)+labs(title="Date of End of Summer for each year",y="Date",x="Year")+scale_y_date()
+```
+
+## Response (Alternate)
+
+### HoltWinters before cusum
+The above method does not seem to smooth out the data before we actually check for trend so let's actually use HoltzWinters before we apply cusum to each year so that we smooth out the data from year to year to see if there's actually any trend there.
+```{r}
+#elongate the matrix into a single vector
+vec <- as.vector(as.matrix(tempdf[,2:21]))
+#turn the vector into a time series object with a frequency of 123 which is the number of samples we have per year
+vects <- ts(vec,frequency=123)
+
+#This can be automatically calculated, but I wanted to smooth out the model more rather than have the model default to a value of 0.9
+alphaVal <- 0.81
+
+#run this on various holtwinters models
+hwModel <- HoltWinters(vec,alpha=alphaVal,beta=FALSE,gamma=FALSE)
+hwTrend <-HoltWinters(vec,alpha=alphaVal,beta=TRUE,gamma=FALSE)
+hwTrendSeasAdd <- HoltWinters(vects,alpha=alphaVal,beta=TRUE,gamma=TRUE,seasonal="additive")
+hwTrendSeasMult <- HoltWinters(vects,alpha=alphaVal,beta=TRUE,gamma=TRUE,seasonal="multiplicative")
+```
+
+### Understanding differences between the model
+Below, we can see a breakdown of how each individual level contributed to each method.
+```{r,fig.width = 13, fig.height = 4}
+plot(fitted(hwModel))
+plot(fitted(hwTrend))
+plot(fitted(hwTrendSeasAdd))
+plot(fitted(hwTrendSeasMult))
+```
+
+```{r}
+length(hwModel$fitted[,1])
+length(hwTrend$fitted[,1])
+length(hwTrendSeasAdd$fitted[,1])
+length(hwTrendSeasMult$fitted[,1])
+```
+Above counts is a good display of how each method words
+* hwModel ran it only with alpha value so this method has 2459 data points, one less than our original dataset
+* hwTrend ran with alpha and beta values to detect trend.  To have trend, we'll need to subtract the previous level so this will only have 2458 data points.
+* both seasonality method needs to subtract the last season which has a frequency of 123 so this would be 2337.
+
+### Is summer ending later?
+Now we can dig into when summer is actually ending after we've smoothed out the time data based on the four different models.
+
+```{r}
+NormAry <- vector()
+TrendAry <- vector()
+SeasAddAry <- vector()
+SeasMultAry <- vector()
+for (i in 1:19)
+{
+  
+  start <- max((i-1)*123,1)
+  end <- (i)*123
+  Norm <- cusum(hwModel$fitted[start:end,1],plot=FALSE)$violations$lower
+  Trend <- cusum(hwTrend$fitted[start:end,1],plot=FALSE)$violations$lower
+  SeasAdd <- cusum(hwTrendSeasAdd$fitted[start:end,1],plot=FALSE)$violations$lower
+  SeasMult <- cusum(hwTrendSeasMult$fitted[start:end,1],plot=FALSE)$violations$lower
+  NormAry[i] <- min(Norm[Norm>63])
+  TrendAry[i] <- min(Trend[Trend>63])
+  SeasAddAry[i] <- min(SeasAdd[SeasAdd>63])
+  SeasMultAry[i] <- min(SeasMult[SeasMult>63])
+}
+```
+
+
+```{r,fig.width = 9, fig.height = 7}
+#setup datatype
+NormDate <- tempdf$DAY[NormAry]
+NormDate <- as.Date(NormDate,format = "%d-%B")
+NormDate <- format(NormDate,format="%m/%d")
+#collapse all the functions together
+TrendDate <- format(as.Date(tempdf$DAY[TrendAry],format = "%d-%B"),format="%m/%d")
+SeasAddDate <- format(as.Date(tempdf$DAY[SeasAddAry],format = "%d-%B"),format="%m/%d")
+SeasMultDate <- format(as.Date(tempdf$DAY[SeasMultAry],format = "%d-%B"),format="%m/%d")
+#get the x axis
+yearVal <- colnames(tempdf)[3:21]
+yearVal <- as.integer(gsub('X','',yearVal))
+#plot each and name them
+p1 <- plot_ly(x=yearVal,y=NormDate,type='scatter',mode='lines',name='Smooth')
+p2 <- plot_ly(x=yearVal,y=TrendDate,type='scatter',mode='lines',name='Trend')
+p3 <- plot_ly(x=yearVal,y=SeasAddDate,type='scatter',mode='lines',name='SeasonAdd')
+p4 <- plot_ly(x=yearVal,y=SeasMultDate,type='scatter',mode='lines',name='SeasonMult')
+#collect in a subplot
+subplot(p1,p2,p3,p4,nrows=4) %>% layout(title="HoltWinter + CUSUM to determine End of Summer Trend")
+```
+When looking at the above graph, we can see the data much better than it was before!  We can see that if we include seasonality, we really do start seeing the trend as the last day of summer starts getting pushed later and later.
+
+
 
 # Question 3
 Describe a situation or problem from your job, everyday life, current events, etc., for which a linear
