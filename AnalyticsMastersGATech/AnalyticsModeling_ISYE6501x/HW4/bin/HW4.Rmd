@@ -1,0 +1,310 @@
+---
+title: "R Notebook"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+---
+
+# Question 1
+Using the same crime data set as in Homework 3 Question 4, apply Principal Component Analysis and
+then create a regression model using the first 4 principal components. Specify your new model in terms
+of the original variables (not the principal components), and compare its quality to that of your solution
+to Homework 3 Question 4. You can use the R function prcomp for PCA. (Note that to first scale the
+data, you can include scale. = TRUE to scale as part of the PCA function.)
+
+```{r}
+library(knitr)
+library(ggplot2)
+library(plotly)
+library(RColorBrewer)
+library(DAAG)
+```
+
+
+
+```{r}
+df<-read.table('uscrime.txt',header=TRUE)
+```
+
+### Running PCA
+Running PCA is simple as a single line.  We need to make sure we scale the data to make sure that when PCA determines the most variance in a certain direction, all the data is scaled to the same dimension or else data with large values will probably show the largest variance.
+```{r}
+prdf <- prcomp(df[,1:15],scale=TRUE)
+```
+
+### PCA variance
+To see how much of the variance PCA captures per individual 
+```{r}
+pcaStdv <- data.frame(prdf$sdev)
+pcaStdv$idx <- as.numeric(row.names(pcaStdv))
+colnames(pcaStdv) <- c("Stdev","Index")
+#can also use:
+#screeplot(prdf, type="lines",col="blue")
+#But mine's prettier =)
+ggplot(pcaStdv,aes(x=Index,y=Stdev,fill=Stdev))+geom_bar(stat="identity",alpha=0.8)+geom_line(color='#009999',size=1,alpha=0.5)+geom_point()+scale_fill_gradient(low="#33FFBF",high="#3354FF")+labs(title="Stdev Captured per Component of PCA")
+```
+From the above data, we do see an elbow joint at 4 PCA components but also another one at 7 PCA components.  The homework asked us to use 4 but I am curious to see if using 7 will provide any additional improvements.
+
+
+### Running lm on PCA
+I decided to run lm on PCA with 4 components, 7 components, and all 15 components.  I compared this to our previous lm model which we ran for all of the variables none PCAed and the variables we selected to be the best.  Below is the result.
+
+```{r,message=FALSE,results="hide"}
+pcaFour <- data.frame(cbind(prdf$x[,1:4],df$Crime))
+pcaSeven <- data.frame(cbind(prdf$x[,1:7],df$Crime))
+pcaFifteen <- data.frame(cbind(prdf$x[,1:15],df$Crime))
+
+
+modelFour <- lm(V5~.,data=pcaFour)
+modelSeven <- lm(V8~.,data=pcaSeven)
+modelFifteen <- lm(V16~.,data=pcaFifteen)
+modelSelect <- lm(Crime~Ineq+Ed+Prob+M+U2+Po1+Crime,data=df)
+modelAll <- lm(Crime~.,data=df)
+
+
+cvFour <- cv.lm(pcaFour,modelFour,m=5,plotit=FALSE)
+cvSeven <- cv.lm(pcaSeven,modelSeven,m=5,plotit=FALSE)
+cvFifteen <- cv.lm(pcaFifteen,modelFifteen,m=5,plotit=FALSE)
+cvSelect <- cv.lm(df,modelSelect,m=5,plotit=FALSE)
+cvAll <- cv.lm(df,modelAll,m=5,plotit=FALSE)
+```
+### R^2 of cross validation
+Below I did a comparison of all the different model's R^2 value to see which one works the best.
+```{r}
+SStot <- sum((df$Crime - mean(df$Crime))^2)
+
+SSres_Four <- attr(cvFour,"ms")*nrow(df)
+SSres_Seven <- attr(cvSeven,"ms")*nrow(df)
+SSres_Fifteen <- attr(cvFifteen,"ms")*nrow(df)
+SSres_Select <- attr(cvSelect,"ms")*nrow(df)
+SSres_All <- attr(cvAll,"ms")*nrow(df)
+
+R2_Four <- 1-SSres_Four/SStot
+R2_Seven <- 1-SSres_Seven/SStot
+R2_Fifteen <- 1-SSres_Fifteen/SStot
+R2_Select <- 1-SSres_Select/SStot
+R2_All <- 1-SSres_All/SStot
+
+print(paste0("R^2 value of model Four is: ",R2_Four))
+print(paste0("R^2 value of model Seven is: ",R2_Seven))
+print(paste0("R^2 value of model Fifteen is: ",R2_Fifteen))
+print(paste0("R^2 value of model Select is: ",R2_Select))
+print(paste0("R^2 value of model All is: ",R2_All))
+```
+Using the selected values from our last homework assignment still gave the best scores, however, if we had to run PCA, picking 7 components rather than 4 gave a significantly better performance.
+
+
+
+### Plotting Fitted Value Against Actual Value
+Now we can plot the fitted value against the actual value to see how well they lined up.
+I've also included a scaled residual plot to do some additional visual comparisons
+```{r}
+plot(modelFour$fitted.values, df$Crime)
+abline(0,1)
+plot(modelFour$fitted.values, scale(modelFour$residuals))
+abline(0,0)
+plot(modelSeven$fitted.values, df$Crime)
+abline(0,1)
+plot(modelSeven$fitted.values, scale(modelSeven$residuals))
+abline(0,0)
+plot(modelFifteen$fitted.values, df$Crime)
+abline(0,1)
+plot(modelFifteen$fitted.values, scale(modelFifteen$residuals))
+abline(0,0)
+plot(modelSelect$fitted.values, df$Crime)
+abline(0,1)
+plot(modelSelect$fitted.values, scale(modelSelect$residuals))
+abline(0,0)
+plot(modelAll$fitted.values, df$Crime)
+abline(0,1)
+plot(modelAll$fitted.values, scale(modelAll$residuals))
+abline(0,0)
+```
+
+### PCA coefficient to data coefficient
+To get the original coefficients, you would need to multiply the coefficients of the PCA model by the eigenvectors generated from PCA, this was made easy using the $rotation dataframe of pca.
+```{r}
+beta0 <- modelFour$coefficients[1]
+betas <- modelFour$coefficients[2:5]
+alphas <- prdf$rotation[,1:4] %*% betas
+t(alphas)
+```
+
+# Question 2
+Using the same crime data set as in Homework 3 Question 4, find the best model you can using (a) a
+regression tree model, and (b) a random forest model. In R, you can use the tree package or the rpart
+package, and the randomForest package. For each model, describe one or two qualitative takeaways
+you get from analyzing the results (i.e., don't just stop when you have a good model, but interpret it
+too).
+### Running and viewing trees generated from rpart library
+
+```{r}
+library(rpart)
+library(rattle)
+library(RColorBrewer)
+crimedf <- read.table('uscrime.txt',header=TRUE)
+rpartAll <- rpart(Crime~.,data=crimedf)
+fancyRpartPlot(rpartAll, palettes=c("BuGn"))
+```
+
+### running and viewing trees generated from tree library
+```{r}
+library(tree)
+treeAll <- tree(Crime~.,data=data.frame(crimedf))
+plot(treeAll)
+text(treeAll)
+```
+
+### Doing a quick R^2 check even though I feel like the tree model would do better because it looks more overfit.
+
+```{r}
+treeyhat <- predict(treeAll)
+treeSSres <- sum((treeyhat-data$Crime)^2)
+
+rpartyhat <- predict(rpartAll)
+rpartSSres <- sum((rpartyhat-data$Crime)^2)
+
+SStot <- sum((df$Crime - mean(df$Crime))^2)
+
+treeR2=1-treeSSres/SStot
+rpartR2=1-rpartSSres/SStot
+
+print(paste0("tree library gave R^2 of ",treeR2))
+print(paste0("rpart library gave R^2 of ",rpartR2))
+```
+Yup, we definitely see a higher R^2 value because of this.
+
+### Prune data back
+Because we really have barely any data, we really shouldn't have more than just 1 split.  But we know that this would probably give a bad R^2 valued
+```{r}
+treePrune <- prune.tree(treeAll, best=2)
+
+prunyhat <- predict(treePrune)
+prunSSres <- sum((prunyhat - data$Crime)^2)
+
+pruneR2=1-prunSSres/SStot
+
+print(paste0("pruned tree gave R^2 of ",pruneR2))
+```
+The ideal thing to do for this model is to actually run linear regression for each branch, then run cross validation on each of these model.  This would give a better depiction of how well it works.  However, I did run out of time for this project.
+
+
+
+### Randomforest
+Now we can run the randomForest model.
+```{r}
+library(randomForest)
+
+numpred <- 5
+forestData <- randomForest(Crime~., data=crimedf, mtry=numpred,importance=TRUE)
+forestyhat <-predict(forestData)
+ssres <-sum((forestyhat-data$Crime)^2)
+SStot <- sum((df$Crime - mean(df$Crime))^2)
+R2=1-SSres/SStot
+
+print(paste0("R2 value: ",R2))
+
+```
+
+
+### Cross Validation on Random Forest
+To run cross validation, I had to use the leave 1 out method where the model trained on the rest of the data set and tested on the single data point that I left out.  The provided R value is quite close to the R value we calculated from the previous step, showing that randomForest is really good at not overfitting or underfitting.
+```{r}
+CVSSres <- 0
+for (i in 1:nrow(crimedf)) 
+{
+  forestModel <- randomForest(Crime ~.,data=crimedf[-i,], mtry=numpred, importance = TRUE)
+  CVSSres=CVSSres+(predict(forestModel, newdata=crimedf[i,]) - crimedf[i,16])^2
+}
+
+SStot <- sum((df$Crime - mean(df$Crime))^2)
+R2=1-CVSSres/SStot
+
+print(paste0("CV R2 value: ",R2))
+```
+
+There's also additional metrics that can help identify components that are helpful in separating the data.  Below are two of them which identifies Po1 and Po2 as major impact factors.
+```{r}
+importance(forestData)
+```
+
+```{r}
+varImpPlot(forestData)
+```
+
+
+
+
+
+# Question 3
+Describe a situation or problem from your job, everyday life, current events, etc., for which a logistic
+regression model would be appropriate. List some (up to 5) predictors that you might use.
+
+## Response
+Logistic regression model would be useful in predicting the whether a patient will be admitted into the ED within the next year.  Some of the factors that contribute to this include:
+* Whether they've been to the ED in the past year(risk of readmission)
+* Whether they have cardio vascular diseases
+* Whether they currently have a grouper of risky diagnoses
+* Whether they are currently on vasodilators 
+* Whether they are overweight
+
+
+# Question 4 Part 1
+Using the [GermanCredit] data set ([description]), use logistic
+regression to find a good predictive model for whether credit applicants are good credit risks or
+not. Show your model (factors used and their coefficients), the software output, and the quality
+of fit. You can use the glm function in R. To get a logistic regression (logit) model on data where
+the response is either zero or one, use family=binomial(link="logit") in your glm function call.
+
+[GermanCredit]: http://archive.ics.uci.edu/ml/machine-learningdatabases/statlog/german/
+[description]: http://archive.ics.uci.edu/ml/datasets/Statlog+%28German+Credit+Data%29
+
+```{r}
+credDF <- read.table("germancredit.txt", sep=" ")
+#convert people who are good(1) to 0 and bad(2) to 1
+credDF$V21[credDF$V21==1] <- 0
+credDF$V21[credDF$V21==2] <- 1
+
+credSub <- sample(1:nrow(credDF), size=round(0.6*(nrow(credDF))))
+credTrain <- credDF[credSub,]
+credVal <- credDF[-credSub,]
+
+model=glm(V21~., family=binomial(link="logit"), data=credTrain)
+
+y_hat <- predict(model, credVal, type="response")
+
+y_pred <- as.integer(y_hat >0.5)
+
+table(y_pred, credVal$V21)
+
+```
+
+
+
+# Question 4 Part 2
+Because the model gives a result between 0 and 1, it requires setting a threshold probability to
+separate between "good" and "bad" answers. In this data set, they estimate that incorrectly
+identifying a bad customer as good, is 5 times worse than incorrectly classifying a good
+customer as bad. Determine a good threshold probability based on your model.
+
+```{r}
+library(pROC)
+roc(credVal$V21,y_pred)
+```
+
+
+```{r}
+table <- as.matrix(table(y_pred,credVal$V21))
+cost <- table[2,1] + 5*table[1,2]
+
+print(table)
+print(cost)
+```
+
+
+
+
+
+
+
