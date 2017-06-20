@@ -1,0 +1,530 @@
+---
+title: "R Notebook"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+---
+
+```{r}
+library(ggplot2)
+library(DAAG)
+library(knitr)
+library(plotly)
+library(RColorBrewer)
+library(leaps)
+library(gplots)
+library(glmnet)
+#read in initial data
+data <- read.table('uscrime.txt',header=TRUE)
+```
+
+
+
+# Question 1 
+ 
+Using the crime data set from Homework 3, build a regression model using: 1. Stepwise regression 2. Lasso 3. Elastic net For Parts 2 and 3, remember to scale the data first - otherwise, the regression coefficients will be on different scales and the constraint won't have the desired effect. 
+ 
+For Parts 2 and 3, use the glmnet function in R.   
+ 
+Notes on R: . For the elastic net model, what we called ?? in the videos, glmnet calls "alpha"; you can get a range of results by varying alpha from 1 (lasso) to 0 (ridge regression) [and, of course, other values of alpha in between]. . In a function call like glmnet(x,y,family="mgaussian",alpha=1) the predictors x need to be in R's matrix format, rather than data frame format.  You can convert a data frame to a matrix using as.matrix - for example, x <- as.matrix(data[,1:n-1]) . Rather than specifying a value of T, glmnet returns models for a variety of values of T.  
+
+## Stepwise Regression
+### Visualize Best Combination at Every Step
+Here I used the regsubsets function (from the leaps library) to automatically go through each step of the stepwise regression.  Then I've marked the combination in each step that has the highest R2adj value and highlighted them in purple.  This way, I can see in what order the algorithm is selecting each individual feature at each step.  For each step, we're only displaying the top 10 best feature sets.
+
+```{r,fig.width = 9, fig.height = 15,warning=FALSE}
+#run stepwise regression
+leaps <- regsubsets(Crime~.,data=data,nbest=10)
+#create sumVec object containing components of summary(leaps)
+sumVec <- summary(leaps)
+#sumVec$which contains a matrix of True/False data relating the step and the features
+stepsMat <- sumVec$which*1 #multiply by 1 turns TRUE/FALSE to 1 and 0
+#add R2adj and step to the features matrix since rownames gets stripped out
+stepsRMat <- data.frame(cbind(stepsMat,sumVec$adjr2),rownames(stepsMat))
+colnames(stepsRMat)[17] <- "R2adj"
+colnames(stepsRMat)[18] <- "Step"
+
+#loop through all rows and if it's the max R2adj value for the step, set all 1's to 2's.
+for (i in 1:8)
+{
+  rowGroup <- stepsRMat[which(stepsRMat$Step==i),]
+  stepsRMat[which(stepsRMat$R2adj==max(rowGroup[,17])),][1:16]=stepsRMat[which(stepsRMat$R2adj==max(rowGroup[,17])),][1:16]*2
+  
+}
+
+#sort by Step for plot viewing
+stepData <- stepsRMat[order(stepsRMat$Step,decreasing=FALSE),]
+plotData <- stepData[1:16]
+
+#convert rownames from 1,1,1 to 1.1,1.2,1.3 to be unique
+val <- rep(1:10,8)
+dot <- rep(".",length(stepData$Step))
+rownames(plotData) <- paste0(stepData$Step,dot,val)
+
+#plot heatmap
+heatmap.2(x = as.matrix(plotData),
+          dendrogram='none',
+          trace='none',
+          Rowv=NA,
+          Colv=NA,
+          col=c("#FFFFFF","#D3D3D3","#944dff"),
+          main="Selected Features in Stepwise Regression at Each Step",
+          xlab="Features",
+          ylab="Step",
+          margins = c(8, 6),
+          lwid=c(.2,4),
+          lhei=c(.25,4),
+          sepwidth=c(0.02,0.05),
+          sepcolor="#F5F5F5",
+          colsep=1:ncol(plotData),
+          rowsep=1:nrow(plotData),
+          key=FALSE
+          )
+
+```
+This plot clearly shows me that M, Ed, Po1, M.F, U1, U2, Ineq, Prob are the final combination that I have at the end of step 8.  But I still want to see how the R2adj value climbed as the algorithm went through each individual step. 
+
+### Visualizing the Increase in R2Adj at Every Step
+This this graph, I can see the increase in the R2Adj value with every combination and also every step.  This can help me determine whether certain combinations of features tend to help.  It can also help me pick out strong performers if the algorithm picks them at every step of the way.
+
+```{r,fig.width = 9, fig.height = 15,warning=FALSE}
+#add R2adj and step to the features matrix since rownames gets stripped out
+R2Mat <- data.frame(cbind(stepsMat,sumVec$adjr2),rownames(stepsMat))
+colnames(R2Mat)[17] <- "R2adj"
+colnames(R2Mat)[18] <- "Step"
+
+#loop through all rows and multiply the rows corresponding to a certain step by that step number.
+#this can help create the color gradient seen below.
+for (i in 1:8)
+{
+  rowGroup <- R2Mat[which(R2Mat$Step==i),]
+  R2Mat[which(R2Mat$R2adj==rowGroup[,17]),][1:16]=R2Mat[which(R2Mat$R2adj==rowGroup[,17]),][1:16]*i
+}
+
+
+#sort by R2adj for plot viewing
+R2adjData <- R2Mat[order(R2Mat$R2adj,decreasing=FALSE),]
+R2plotData <- R2adjData[1:16]
+
+#convert rownames to be rounded to 5 digits so it's still unique
+rownames(R2plotData) <- round(R2adjData$R2adj,5)
+
+#plot heatmap
+heatmap.2(x = as.matrix(R2plotData),
+          dendrogram='none',
+          trace='none',
+          Rowv=NA,
+          Colv=NA,
+          #col=c("#FFFFFF","#D3D3D3","#944dff"),
+          col=append("#FFFFFF",brewer.pal(8, "Set1")),
+          main="Selected Features in Stepwise Regression at Each Step",
+          xlab="Features",
+          ylab="R2 Adjusted",
+          margins = c(6, 6),
+          lmat=rbind(c(0,3),c(2,1),c(0,0),c(0,4)),
+          lwid=c(.2,4),
+          lhei=c(.25,4,.1,.4),
+          sepwidth=c(0.02,0.05),
+          sepcolor="#F5F5F5",
+          colsep=1:ncol(R2plotData),
+          rowsep=1:nrow(R2plotData),
+          key=TRUE,
+          keysize=1,
+          key.title="Legend",
+          key.xlab="Step",
+          key.xtickfun=function()
+          {
+            return
+            (
+              list(at=seq(0.05555,1,0.1111),labels=seq(0,8))
+            )
+          }
+          )
+
+#Using just a basic plot
+#plot(leaps,scale="adjr2",main="Stepwise Regression Features VS R2",col="#11324B")
+```
+Visually from this graph, you can really see a few things:
+* adding a feature doesn't always increase your R2adj value
+* solid features in this are M, Ed, Po1, U2, Ineq, Prob
+* Step 6 with our solid features outshines almost every set in step 7 and many in step 8
+* Adding the combination of M.F and U1 to our core set actually pushes the R2Adj value quite a bit farther past the rest.
+
+My theory is that having just the 6 features may perform the best in a real world scenario as it helps to generalize well and does not overfit the additional two parameters that the algorithm tries to pull in.
+
+### Validate My Theory
+Now, I need to run cross validation for these features to ensure that this is probably the best combination.
+```{r,results='hide'}
+#run lm model
+model1 <- lm(Crime~M+Ed+Po1+U2+Ineq+Prob,data=data)
+model2 <- lm(Crime~M+Ed+Po1+U2+Ineq+Prob+M.F+U1,data=data)
+
+#cross validate
+cvMod1 <- cv.lm(data,model1,m=5, plotit=FALSE, printit=TRUE)
+cvMod2 <- cv.lm(data,model2,m=5, plotit=FALSE, printit=TRUE)
+
+#Calculate R^2
+SStot <- sum((data$Crime-mean(data$Crime))^2)
+mod1R2 <- 1-(attr(cvMod1,'ms')*nrow(data))/SStot
+mod2R2 <- 1-(attr(cvMod2,'ms')*nrow(data))/SStot
+```
+```{r}
+print(paste0('model1 features R^2: ',mod1R2))
+print(paste0('model2 features R^2: ',mod2R2))
+print(paste0('model1 mean square: ',attr(cvMod1,"ms")))
+print(paste0('model2 mean square: ',attr(cvMod2,"ms")))
+```
+Even if it's just slightly, the model I picked with generalized features at Step 6performed better in cross validation than the specialized ones from Step 8.
+
+
+## Lasso Regression
+
+### Getting Coefficients
+It looks like glmnet has an alpha is defaulted to 1 so all of the weight is on the abs(a) is less than or equal to T, this is effectively lasso regression.  Because the So feature is binary, scaling it would get rid of its binary nature so we won't be scaling that feature.
+```{r}
+library(glmnet)
+#read in initial data
+data <- read.table('uscrime.txt',stringsAsFactors=FALSE,header=TRUE)
+
+scaledata <- as.data.frame(cbind(data[,2],scale(data[,c(1,3:15)]),data[,16]))
+colnames(scaledata)[1] <- "So"
+colnames(scaledata)[16] <- "Crime"
+
+set.seed(1)
+lassoMod <- cv.glmnet(x=as.matrix(scaledata[,-16]),y=as.matrix(scaledata[,16]),alpha=1,nfolds=5,type.measure="mse",family="gaussian")
+
+coef(lassoMod, s=lassoMod$lambda.min)
+```
+
+### Cross Validate Coefficient Results
+From the above coefficients, we see that Lasso ended up removing LF, Po2, and Time.  But since the data is all scaled(except for So) I can eyeball the values of each and specify which ones are probably more impactful.  "So" is binary, but since it's a value of 1 and 0, it's basically scaled and it has a pretty low value so I will ignore that one.  The significant ones looks like "Po1","Ineq","Ed","U2","M" if I were to set the threshold where abs(coeff) > 100. So let's test those out!
+
+```{r,results='hide'}
+#run lm model
+modelLasso1 <- lm(Crime~Po1+Ineq+Ed+U2+M,data=scaledata)
+modelLasso2 <- lm(Crime~So+M+Ed+Po1+M.F+Pop+NW+U1+U2+Wealth+Ineq+Prob,data=scaledata)
+
+#cross validate
+cvLassoMod1 <- cv.lm(scaledata,modelLasso1,m=5, plotit=FALSE, printit=TRUE)
+cvLassoMod2 <- cv.lm(scaledata,modelLasso2,m=5, plotit=FALSE, printit=TRUE)
+
+#Calculate R^2
+SStot <- sum((scaledata$Crime-mean(scaledata$Crime))^2)
+lassoMod1R2 <- 1-(attr(cvLassoMod1,'ms')*nrow(scaledata))/SStot
+lassoMod2R2 <- 1-(attr(cvLassoMod2,'ms')*nrow(scaledata))/SStot
+```
+```{r}
+print(paste0('model1 features R^2: ',lassoMod1R2))
+print(paste0('model2 features R^2: ',lassoMod2R2))
+```
+We see for sure that model 1 with less features performs better than model 2 which contain a lot more features.  Just like stepwise regression, the model may not always give you the best results.
+
+## Elastic Net
+
+### Loop Through Alpha and Visualize R2
+First I looped through 10 values of alpha with a single seed.  It looks like alpha at 0.5 performed the best.
+```{r}
+alphaAry <- seq(0,1,0.1)
+seedRun <- vector()
+R2ary <- vector()
+set.seed(1)
+
+for (i in 1:length(alphaAry))
+{
+  elasticMod <- cv.glmnet(x=as.matrix(scaledata[,-16]),y=as.matrix(scaledata[,16]),alpha=alphaAry[i],nfolds=5,type.measure="mse",family="gaussian")
+  R2ary[i] <- elasticMod$glmnet.fit$dev.ratio[which(elasticMod$glmnet.fit$lambda == elasticMod$lambda.min)]
+}
+qplot(alphaAry,R2ary)+labs(title="Elastic Net R2 Value at Different Alphas", x="Alpha", y="R2")
+
+```
+
+But I got curious and wondering if another random run will give it different values.  
+
+```{r}
+set.seed(2)
+
+for (i in 1:length(alphaAry))
+{
+  elasticMod <- cv.glmnet(x=as.matrix(scaledata[,-16]),y=as.matrix(scaledata[,16]),alpha=alphaAry[i],nfolds=5,type.measure="mse",family="gaussian")
+  R2ary[i] <- elasticMod$glmnet.fit$dev.ratio[which(elasticMod$glmnet.fit$lambda == elasticMod$lambda.min)]
+}
+qplot(alphaAry,R2ary)+labs(title="Elastic Net R2 Value at Different Alphas", x="Alpha", y="R2")
+```
+
+### Running 50 Seeds to Check for Elastic Net Pattern
+Lo and behold! now setting it to 1(lasso) gives the best values.  We can't give up now!  We have to loop through a few iterations of this cross validation to see whether there is a pattern that can be discerned from this data!!  So I decided to run it through 50 different seeds and take the average R2 value of every alpha run.
+```{r}
+alphaAry <- seq(0,1,0.1)
+seedRun <- vector()
+R2ary <- vector()
+
+
+
+for (i in 1:length(alphaAry))
+{
+  for (j in 1:50)
+  {
+    set.seed(j)
+    elasticMod <- cv.glmnet(x=as.matrix(scaledata[,-16]),y=as.matrix(scaledata[,16]),alpha=alphaAry[i],nfolds=5,type.measure="mse",family="gaussian")
+    seedRun[j] <- elasticMod$glmnet.fit$dev.ratio[which(elasticMod$glmnet.fit$lambda == elasticMod$lambda.min)]
+  }
+  R2ary[i]=mean(seedRun)
+}
+
+qplot(alphaAry,R2ary)+labs(title="Elastic Net R2 Value at Different Alphas", x="Alpha", y="R2")
+```
+It's pretty cool to see that a shape did emerge, almost like the top of a heart!  But we find that 0.5 really isn't the most optimal value even though it is very close.  0.6 out performs it.  We can also see that Ridge regression probably would've been horrible if we tried it and Lasso regression performed not as badly but is still at the bottom of the scale.
+
+### Best Elastic Net Coefficients
+Previously, we've seen that chopping down on unnecessary coefficients really help improve the accuracy of the algorithm, so let's see if our best performing method will provide us with that by displaying 10 different seeds of the coefficients generated.
+```{r,message=FALSE,warning=FALSE}
+CoeffAry <- as.vector(seq(1:5))
+for (i in 1:10)
+{
+  set.seed(i)
+  bestElasticMod <- cv.glmnet(x=as.matrix(scaledata[,-16]),y=as.matrix(scaledata[,16]),alpha=0.6,nfolds=5,type.measure="mse",family="gaussian")
+
+  CoeffAry=cbind(CoeffAry,coef(bestElasticMod, s=bestElasticMod$lambda.min))
+}
+
+CoeffAry
+```
+Overall, we see that Elastic Net cuts down 3 features on average which isn't more than what Lasso has shown us.  However, if we take a look at the coefficients, we see that certain values stand out a lot more than before.  Po1, Ed, M, Ineq, Prob are all pretty high in value and pretty consistently high.  As we've seen before, they are features that seem to perform the best and giving them higher weights essentially marks them as the best features to use.  I think elastic net would be a favorite for feature selection.
+
+ 
+# Question 2 
+ 
+Describe a situation or problem from your job, everyday life, current events, etc., for which a design of experiments approach would be appropriate. 
+
+## Response
+When implementing a new feature in my EHR software, I need to decide whether one navigation bar will be better than another.  Each navigation bar will contain different buttons that access different workflows.  Finding the right combination of buttons will require some testing, but we also want to implement the best navigation bar as quickly as possible as physician's time is equal to dollars.  So we'll need to setup a design of experiments to narrow down the best results providing the best feedback from various physicians.  Caveats may be that our sample population of physicians may have varying opinions of the system which can affect the outcome so we may need to control for that component.
+
+ 
+# Question 3 
+ 
+To determine the value of 10 different yes/no features to the market value of a house (large yard, solar roof, etc.), a real estate agent plans to survey 50 potential buyers, showing a fictitious house with different combinations of features.  To reduce the survey size, the agent wants to show just 16 fictitious houses. Use R's FrF2 function (in the FrF2 package) to find a fractional factorial design for this experiment: what set of features should each of the 16 fictitious houses?  Note: the output of FrF2 is "1" (include) or  "-1" (don't include) for each feature. 
+
+## Response
+Using the FrF2 package, nrun is the number of test houses we want to run this on.  In our case, we're using 16 houses as the testing population.  nfactors is the number of features, in our case, the 10 different yes/no features.  On thing that's interesting about this function is that nfactors must be at most 1 less than the number of runs which make sense when trying to design an experiment to take into consideration your feature size.
+```{r}
+library(FrF2)
+set.seed(1)
+fractal <- FrF2(nrun=16,nfactors=10)
+fractal
+```
+
+ 
+# Question 4 
+ 
+For each of the following distributions, give an example of data that you would expect to follow this distribution (besides the examples already discussed in class). a. Binomial    b. Geometric    c. Poisson    d. Exponential   e. Weibull 
+
+### Plotting function
+I decided that it wasn't enough to just provide an example but to also visualize the distribution to get a better understanding of how it curves.  Below is a generalized function which I can feed in a lambda value, a X sequence, a function, and a title.  It will output a graph displaying the different lambda values.
+```{r}
+library(reshape2)
+#lambda needs to be a sequence of tuning values
+#func is a function that will execute an equation given an input a and x
+
+exampleLambda <- seq(.1,0.9,0.05)
+exampleXVal <- seq(0,4,.2)
+exampleFunc <- function(a,x)
+{
+  output <- a*(1-a)^(x-1)
+  return(output)
+}
+exampleTitle <- "Title Here"
+
+
+plotDistrib <- function(lambda,xVal,func,plotTitle)
+{
+  xValLen <- length(xVal)
+  ary=matrix(NA,xValLen,length(lambda))
+  for (j in 1:length(lambda))
+  {
+    for (i in 1:xValLen)
+    {
+      a=lambda[j]
+      x=xVal[i]
+      ary[i,j] <- func(a,x)
+    }
+  }
+  #return(ary)
+  colnames(ary) <- lambda
+  meltdf <-melt(ary,id="lambda")
+  meltdf$Var2=as.factor(meltdf$Var2)
+  colnames(meltdf) <- c("Var1",  "a",  "value")
+  
+  breaks <- seq(0,xValLen,floor(xValLen/5))
+  labels <- xVal[breaks+1]
+  p <- ggplot(meltdf,aes(x=Var1,y=value,color=a,group=a)) + geom_line() + labs(title=plotTitle, x="X", y="Y")+theme_minimal()+scale_x_continuous(breaks = breaks, labels = labels, limits = c(0,xValLen))
+  #p <- ggplot(meltdf,aes(x=Var1,y=value,color=a,group=a)) + geom_line() + labs(title=plotTitle, x="X", y="Y")+theme_minimal()+scale_x_continuous(breaks = seq(0:20), labels = xVal[1:19], limits = c(0,20))
+  return(p)
+}
+
+p <- plotDistrib(exampleLambda,exampleXVal,exampleFunc,exampleTitle)
+p
+
+```
+
+
+### Binomial
+**Definition**: a frequency distribution of the possible number of successful outcomes in a given number of trials in each of which there is the same probability of success.
+
+**Example**: The classic coin flip where the p will most likely be 0.5.  I say most likely because we never know if the face side is actually slightly heavier than the tail side therefore giving it a 0.501 probably of landing face down.
+
+**Equation**: The probability of getting exactly $k$ successes in $n$ trials
+$$
+Pr(X=k) = \frac{n!}{k!(n-k)!}p^k(1-p)^{n-k}
+$$
+
+**R Code**:
+
+```{r}
+BinomLambda <- seq(0.1,.9,0.05)
+BinomXVal <- seq(0,20,0.1)
+BinomFunc <- function(a,x)
+{
+  n=max(x)
+  k=x
+  p=a
+  NFac=factorial(n)
+  KFac=factorial(x)
+  output <- ((NFac/(KFac*factorial(n-k)))*(p^k)*(1-p)^(n-k))
+  return(output)
+}
+BinomTitle <- "Binomial Distribution"
+p <- plotDistrib(BinomLambda,BinomXVal,BinomFunc,BinomTitle)
+p
+
+```
+### Geometric
+**Definition**: The geometric distribution is a negative binomial distribution, which is used to find out the number of failures that occurs before single success, where the number of successes is equal to 1.
+
+**Example**: Physician is testing various medications on patients all of which have a $p$ chance of curing the patient.  This follows a geometric distribution listed in equation 1 below to show that the chance of success increases with every trial.
+
+**Equation 1**: the probability that the first occurrence of success requires k number of independent trials, each with success probability p. If the probability of success on each trial is p, then the probability that the kth trial (out of k trials) is the first success is
+$$
+Pr(X=k) = (1-p)^{k-1}p
+$$
+
+**Equation 2**: the following form of the geometric distribution is used for modeling the number of failures until the first success.
+
+$$
+Pr(Y=k) = (1-p)^{k-1}p
+$$
+$$
+Y=X-1
+$$
+
+**R Code**: 
+```{r}
+GeomLambda <- seq(0.1,.9,0.05)
+GeomXVal <- seq(0,2,0.1)
+GeomFunc <- function(a,x)
+{
+  
+  k=x
+  p=a
+  output <- (1-p)^(k-1)*p
+  return(output)
+}
+GeomTitle <- "Geometric Distribution"
+p <- plotDistrib(GeomLambda,GeomXVal,GeomFunc,GeomTitle)
+p
+
+```
+
+
+### Poisson
+**Definition**: The probability of a given number of events occurring in a fixed interval of time and/or space if these events occur with a known average rate and independently of the time since the last event.
+
+**Example**: The probability of patients arriving in the emergency room between 12am and 4am near a college campus.  Caveat here is specifying an interval.  This interval will have to be a week since there will be different number of parties during different days of the week.  Additionally, this model should be limited to the school year because after that, I bet the numbers will drop significantly.
+
+**Equation**: k is the number of occurrences during that time period. $\lambda$ is the expected number of occurrences. 
+$$
+P(k\ events\ in\ interval)=\frac{e^{-\lambda}\lambda^k}{k!}
+$$
+
+**R Code**: 
+```{r}
+PoissonLambda <- seq(0.25,5,0.25)
+PoissonXVal <- seq(0,10,.25)
+PoissonFunc <- function(a,x)
+{
+  lambda=a
+  k=x
+  output <- (exp(-lambda)*(lambda^k))/factorial(k)
+  return(output)
+}
+PoissonTitle <- "Poisson Distribution"
+p <- plotDistrib(PoissonLambda,PoissonXVal,PoissonFunc,PoissonTitle)
+p
+
+```
+
+
+### Exponential
+**Definition**: 
+
+**Example**: 
+
+**Equation**: 
+
+**R Code**:
+```{r}
+expoLambda <- seq(0,5,0.3)
+expoXVal <- seq(0,1,.01)
+expoFunc <- function(a,x)
+{
+  output <- a*exp(-a*x)
+  return(output)
+}
+expoTitle <- "Exponential Distribution"
+p <- plotDistrib(expoLambda,expoXVal,expoFunc,expoTitle)
+p
+
+```
+
+### Weibull
+**Definition**: 
+
+**Example**: 
+
+**Equation**: 
+
+**R Code**:
+```{r}
+weibullLambda <- seq(0.1,2,0.1)
+weibullXVal <- seq(0,2,.01)
+weibullFunc <- function(a,x)
+{
+  output <- a*x^(a-1)*exp(-(x^a))
+  return(output)
+}
+weibullTitle <- "Exponential Distribution"
+p <- plotDistrib(weibullLambda,weibullXVal,weibullFunc,weibullTitle)
+p
+```
+
+
+```{r}
+
+weibullLambda <- seq(0,5,.2)
+weibullXVal <- seq(0,2,.01)
+weibullFunc <- function(a,x)
+{
+  output <- a*x^(a-1)*exp(-(x^a))
+  return(output)
+}
+weibullTitle <- "Exponential Distribution"
+p <- plotDistrib(weibullLambda,weibullXVal,weibullFunc,weibullTitle)
+p
+```
+
+
+
+### Reference 
+[earlglynn] has a really good github segment on the heatmap2 package.  He breaks down various parameter syntax to help understand how to use this package.
+[earlglynn]: http://earlglynn.github.io/RNotes/package/gplots/heatmap2.html
+ 
