@@ -224,6 +224,7 @@ We see for sure that model 1 with less features performs better than model 2 whi
 
 ### Loop Through Alpha and Visualize R2
 First I looped through 10 values of alpha with a single seed.  It looks like alpha at 0.5 performed the best.
+
 ```{r}
 alphaAry <- seq(0,1,0.1)
 seedRun <- vector()
@@ -236,7 +237,6 @@ for (i in 1:length(alphaAry))
   R2ary[i] <- elasticMod$glmnet.fit$dev.ratio[which(elasticMod$glmnet.fit$lambda == elasticMod$lambda.min)]
 }
 qplot(alphaAry,R2ary)+labs(title="Elastic Net R2 Value at Different Alphas", x="Alpha", y="R2")
-
 ```
 
 But I got curious and wondering if another random run will give it different values.  
@@ -465,19 +465,26 @@ p
 
 
 ### Exponential
-**Definition**: 
+**Definition**: the probability distribution that describes the time between events in a Poisson process, i.e. a process in which events occur continuously and independently at a constant average rate.
 
-**Example**: 
+**Example**: Battery life of my cellphone can be represented by an exponential function.  I get it charged to 100% in the morning and by the time I leave for work, it's down to 80%.  Throughout the day it slowly discharges until I'm about to sleep and I'm browsing Imgur and I can squeeze out the last 5% of the battery for 3 hours.
 
 **Equation**: 
+$$
+f(x;\lambda)= \begin{cases}
+              \lambda e^{-\lambda x},& \text{if } x\geq 0\\
+              0,              & x < 0
+              \end{cases}
+$$
 
 **R Code**:
 ```{r}
-expoLambda <- seq(0,5,0.3)
-expoXVal <- seq(0,1,.01)
+expoLambda <- seq(0,2,0.2)
+expoXVal <- seq(0,5,.1)
 expoFunc <- function(a,x)
 {
-  output <- a*exp(-a*x)
+  lambda=a
+  output <- lambda*exp(-lambda*x)
   return(output)
 }
 expoTitle <- "Exponential Distribution"
@@ -487,30 +494,21 @@ p
 ```
 
 ### Weibull
-**Definition**: 
+**Definition**: The Weibull distribution is used in assessing product reliability to model failure times and life data analysis. 
 
-**Example**: 
+**Example**: Since Weibull can model both an increase and a decrease function, we can use it to tune and fit the life of a product.  New products that go out might fail quickly if they are built poorly but once they hit their useful life, they'll remain low for failure rates.  Toward the end of their life cycle, they may have a higher chance of failing.
 
 **Equation**: 
+$$
+f(x;\lambda , k)= \begin{cases}
+              \frac{k}{\lambda}(\frac{x-\mu}{\lambda})^{k-1} e^{-(\frac{x-\mu}{\lambda})^k},& \text{if } x\geq 0\\
+              0,              & x < 0
+              \end{cases}
+$$
 
-**R Code**:
+**R Code**: In our code, we assumed a $\mu$ of 0 and a $\lambda$ value of 1 to display the standard Weibull distribution.
 ```{r}
 weibullLambda <- seq(0.1,2,0.1)
-weibullXVal <- seq(0,2,.01)
-weibullFunc <- function(a,x)
-{
-  output <- a*x^(a-1)*exp(-(x^a))
-  return(output)
-}
-weibullTitle <- "Exponential Distribution"
-p <- plotDistrib(weibullLambda,weibullXVal,weibullFunc,weibullTitle)
-p
-```
-
-
-```{r}
-
-weibullLambda <- seq(0,5,.2)
 weibullXVal <- seq(0,2,.01)
 weibullFunc <- function(a,x)
 {
