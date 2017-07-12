@@ -1,0 +1,118 @@
+---
+title: "Power Company Case Study (SBAR format)"
+output:
+  html_notebook:
+      toc: true
+      toc_depth: 3
+---
+
+*Note: this assignment was completed before watching the videos that provide a recommended solution so ideas may or may not be similar.
+
+## Situation
+The power company, Alternative Conduction and Dense Concentration(ACDC), is losing money to customers who are not paying their electric bills.  To prevent further waste of energy, they are looking to turn off the power for the non-paying customers but have only a limited number of technicians to send out per month as gas and technican's time costs money.  ACDC is looking to find the most efficient way to identify the customers who aren't paying and the best way to prioritize who to turn the power off for.
+
+
+
+## Background
+ACDC recently conducted an analysis of their customer population and realized that there is a good portion of customers that aren't paying their electricity bills.  This is contributing to a large deficit in their budget for expansion and upgrades to more renewable resources. (I slightly tweaked the scenario) Of the customers that aren't paying their electricity bills on time, they also notice a sub population that is just forgetful.  They tend to be late on their payment but will eventually pay.  ACDC currently have X technicians staffed to drive out to various sites to turn off the power supply but they will not be able to keep up with the number of customers who do not pay per month.  
+
+
+
+## Assessment
+The main goal of this analytics project is to minimize the loss of money due to non-paying customers.  To do so, we will need to break down the problem to different analytics problems each with unique methods to tackle.  Additionally, we'll also need to think outside the box to tackle this problem from more of a real world perspective.
+
+### Identifying non-paying customers
+First, we need to segment out customers who may not pay their upcoming monthly bill.  To do so, we'll need to collect some metrics that may be strong indicator of a person's habit or character.  Below is a list that I believe may correlate well with whether a customer will pay their bill or not for the upcoming month. 
+
+*Note: We cannot use any metrics that can identify the customer's gender or race
+
+Metrics
+
+* Income (static)
+* Debt (static)
+* Credit Score (static)
+* Highest Education/Degree (static)
+* Length of Stay at Location in Years (static)
+* Employment History in Years (static)
+* Age (static)
+* Power Consumption Last Month (dynamic)
+* Paid Last Month (dynamic)
+* Paid Last Month On Time (dynamic)
+* Number of on time payment within the past year moving (dynamic)
+* Price of S&P 500 (dynamic)
+
+We will be limiting the data collect to only the past year therefore a large number of the metrics above will not change(static) and a few will depend on the month(dynamic). The static data may already exist for ACDC as they've collected this during the customer registration process or can be derived from known information (i.e. length of stay at location).  With this in mind, we can now define our dependent variable.  Because this data matters over time, we will need to use the metrics data for m to predict whether the customer will pay for m+1. (m=month)
+
+Y-value
+
+* 1 if customer paid in m+1 and 0 if customer did not pay
+
+Once we have the data collection, we know we will have gaps and holes in our data because no one's perfect.  Therefore, we will need to look to see whether we need to impute the data or remove the data.  Depending on how large our dataset is, this might be the better option.  Otherwise, we can impute the data using regression with perturbation assuming there is a good amount of correlation.  Otherwise, using the mean/median/mode of the values can also be helpful.
+
+Next, we will separate our data using n-fold cross validation and run it through multiple classification algorithms in a train with 60% and cross-validate with 20% of the data fashion.  This way, we will always have 20% of the data to test the actual performance of the algorithm.  Below is a list of algorithms that we can test for classification:
+
+Algorithms
+
+* Logistic Regression
+* K-nearest neighbors
+* Support Vector Machine
+* Random Forest
+* XGBOOST
+
+Each of these algorithms will have different tuning methods for feature selection and optimization which I won't go into detail.  But once we've tune each algorithm to the optimal parameters, we can compare the logloss of the output and pick the best one to go with.  From there, we can tune the threshold for the predicted probability that a customer will default on their payment.
+
+The output of this will be a group of customers who will most likely pay vs a group that will most likely not pay.
+
+### Identifying forgetful customers
+From the group of non-paying customers, we can further attempt to break this down to another optimal algorithm to determine if there is a group of customers in this that will evetually pay.  Using the same method as above to classify this group.  We can even optimize this with a regression tree.
+
+
+### Take action for forgetful customers
+One thing we should consider is recommending that the forgetful customers setup autopay so that they do not need to remember paying every month.  Many times, these customers are too busy with various things in life that they often do not keep track of what they consider lower priority.  Providing a way to automate this payment process can save them and ACDC a lot of money.  For those that decline on a monthly basis, there is the option to send a reminder via email/mail based on the customer's preference.  However, the cost of hiring a developer to build this email system or hire staff to manually send out mail on a monthly basis will need to be factored in to a later optimization model.
+
+
+### Remote System
+Before we consider sending technicians out, we should look into additional new technologies that allows for remote shutdown so that power cutoffs can be done from a central location rather than needing to send technicians out.  This will be a basic flat fee implementation plus minor maintenance as compared to the continuous cost of hiring and driving technicians out to various sites to shutdown the power.  There will be a cross over point where the cost of having technicians will outweight the cost of implementing this remote system.  
+
+
+### Shutting Down Power
+The power shutdown problem will best be solved via an optimization method.  Out goal is to minimize the cost of the entire process by taking into account the cost of the staff's drive and service time plus the cost of not turning off the power.
+
+Variable
+
+* Number of staff per month
+
+Constraints
+
+* staff driving time + staff service Time <= 8 hours per staff per day
+* staff driving time + staff service Time > 0 hours per staff per day for non-holidays and weekends
+* per staff <= 40 hours a week
+* staff cost * 1.5 if staff weekly hour > 40 hours
+* 0 < driving cost < X
+* 0 < cost of not turning power off < Y
+* 8.50 < staff cost < Z
+
+Optimization
+
+* Minimize(staff cost + driving cost + cost not turning off power)
+
+### Driving
+Additionally, we can even use regression to predict the possible geo-location of customers who may not pay and map out possible paths for the technician to travel using the network model.
+
+
+## Recommendation
+Recommendation is usually done after completing the analysis, but assuming we've completed the analysis, we'll provide the following recommendations:
+
+* Implementing the predictive algorithm Y to detect forgetful customers and provide pro-active reminders either through bill pay reminder or auto pay to help improve the collection rates for these customers.
+* Create KPI to keep track of the improvement of the on time payments after implementation of this method
+* Implement the predictive algorithm X to detect non-paying customers and send technicians out to shutdown power for them.
+* Create KPI to track the cost savings based on the predictive algorithm to show how well it improves the system (also shows the value of the data scientist)
+* Balance the hiring of the technicians based on the output of the optimization model to keep costs low
+* Utilize the network model to plot out the technicians path to minimize travel time.
+* Invest in remote shutdown so that you can slowly fade out technicians and control all shutdown from a single location.  Possibly automating the processing using machine learning.
+
+
+
+
+
+
