@@ -1,5 +1,5 @@
 ---
-title: "Retailer shelf recommendation (SBAR format)"
+title: "Retailer Shelf Recommendation (SBAR format)"
 output:
   html_notebook:
       toc: true
