@@ -1,0 +1,99 @@
+---
+title: "Retailer shelf recommendation (SBAR format)"
+output:
+  html_notebook:
+      toc: true
+      toc_depth: 4
+---
+
+*Note: this assignment was completed before watching the videos that provide a recommended solution so ideas may or may not be similar.
+
+
+## Situation
+A local large retailer named Buy n Large reached out to us in hopes of increasing their profit margin.  After watching their sales and customer behavior for a few years, their CEO Shelby Forthright documented the following three hypotheses:
+
+* Having more shelf space for a product would yield more sales of that product.
+* Having more sales of a product would yield more sales of a complementary product.
+* Sales of a product would be greater if a complementary product is placed adjacent to it.
+
+He believes very strongly in these hypothesis and believe that the store needed to do a re-placement of all their products and is looking to us to determine the best allocated space for each product.  Not only does he want us to come up with a method to optimize it, he also wanted us to come up with a series of KPIs (Key Performance Indicators) to keep track of how well the new method is doing.
+
+
+## Background
+Buy n Large is a retail store that recently hit a lull in their sales after a large expansion.  Their goal is to be the largest retail store in the world and expanding into a space program.  To stay above the competition, they are looking to analytics to optimize their operations.  However, they to have some restrictions they need to work with.
+
+* Total amount of space the store has
+* Each product has a min and max amount of shelf space it can take up
+
+There are also a few things that we need to take into account that Buy n Large does that other retailers usually do not do.
+
+* They do not have promotions for products, they firmly believe it is too much work to move a whole bundle of products to the front just to promote it.
+* They do not accept additional payments from companies to provide them more shelf space.  Most people think they do this because it's honorable but in reality, they don't like manually cashing checks from these companies on a monthly basis.
+
+### Data
+Like all large corporations, Buy n Large have a pretty robust Data Warehouse containing all of their historical data.
+
+* Number of sales aggregated by day
+* Cost of each individual product by day
+* Number of items on the shelf at the start of the day (can use this to calculate shelf space)
+* Number of items on the front row of the shelf at the start of the day (can use this to calculate customer viewable shelf space)
+* Dimension of each item on the shelf (can use this to calculate shelf space)
+* Location of each product on each individual day
+* A [Bridge Table] containing the mappings of each product to products that are complementary to it.
+
+[Bridge Table]: https://www.youtube.com/watch?v=P_nhBKs25DQ
+
+
+## Assessment
+This problem is broken down into three parts.  First, we need to test if Shelby's three hypotheses are correct.  Second, we need to find the optimal space needed for each individual product to provide a recommendation to Buy n Large to implement.  Third, we need to keep track of the sales to see whether our recommendation has made an impact on Buy n Large's profit margin.
+
+### Testing Shelby's Hypotheses
+In order to test Shelby's hypotheses we will need to use all of Buy n Large's historical data.
+
+#### More shelf space, more sales
+The first hypothesis is that "having more shelf space for a product would yield more sales of that product."  We can test this by plotting the amount of shelf space a product takes up against the number of sales of that product per day.  If we see a strong $R^2$ value then we can conclude that there is a relationship.  If not, we can say that there is not a relationship.  We can also plot the amount of customer viewable shelf space against the number of sales of that product per day.  The customer viewable shelf space is the width of the shelf which the customer sees, this way, we don't take into account the products deeper on the shelf which the customer does not see.
+
+#### More sale, more complementary sales
+The second hypothesis is that "having more sales of a product would yield more sales of a complementary product."  This can also be tested by running a linear regression on complementary products across time.  If the sale of one increases, the other should increase and vice versa.  Because of this, the linear regression should yield a pretty high $R^2$ value.
+
+#### Greater combined sale when complementary products are put together
+The third hypothesis is that "Sales of a product would be greater if a complementary product is placed adjacent to it."
+This observation by the CEO probably was made when they completed small tests of this before.  If they haven't, it would be simple enough to run a few A/B tests to collect data about cases when complementary products were placed next to each other and when they were placed separately from each other.  With these historical A/B test data, we can determine whether the number of sales of placing complementary products together has a large enough significance margin with the sales of not placing complementary products together.
+
+### Optimization model for shelf space
+After confirming Shelby's Hypotheses as correct, incorrect, or a mixture of both, we can start optimizing for shelf space using...optimization (clever...I know).
+
+#### Predicted number of units sold
+Before we begin the optimization model, there's actually one input into the optimization model we need to build before running it.  This is to provide an equation that will predict the number of units that will be sold for each product.  Because each product is different, we will need to build a linear regression for each product.  The independent variables are the shelf space of the complementary products and the coefficients are the weights we training based on previous sales data.  This will basically mean, for every x amount of shelf space of complementary product close to our product, it will boost the sales by coefficient amount. We can then add this amount to another linear regression model that models the change in sales according to the amount of shelf space provided for each product.
+
+#### Optimization model
+Now that we've gotten the important metric out of the way, we can build our optimization model.
+
+assumptions: items that sell well(based on our previous regression with a threshold value) being placed together will be placed next to each other
+
+Variable
+
+* amount of shelf space for each product
+* binary value of whether the product was included
+
+Constrains
+
+* min/max shelf space of each product
+* total amount of shelf space in the store
+* binary value set to 1 for each product that the store must sell on its shelves
+
+Optimization
+
+* maximize sum([cost of item] x [predicted number of units that can be sold])
+* where predicted number of units that can be sold equals the predicted amount increased based on complementary items plus the predicted number of units that ca be sold based on shelf space.
+
+
+### Measuring outcome
+To measure whether our suggested model change has made an impact or not, we will run an ARIMA/CUSUM analysis on the total sales and also on the sales of individual products.  Running ARIMA on total sales for historical data before we've made the change will give us a baseline to work from.  Running CUSUM on data after our change can tell us whether we've actually deviated from the baseline or not.  Doing the ARIMA/CUSUM combination for individual sales in our optimized configuration can give us a clearer picture of where the majority of our profits came from and how accurately did our optimization model predict this.
+
+
+## Recommendation
+Our recommendation is for Buy n Large to give us all of their data and in exchange, we will provide a table including all the items in their inventory with a column specifying the size they should allot for each product and which complementary products they should put next to it.  Buy n Large can then configure their store to fit these specifications.  After running this new model for a month, they can run our outcome analysis to see the profit our model has churned out and thank us.
+
+
+
