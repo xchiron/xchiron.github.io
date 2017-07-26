@@ -1,0 +1,112 @@
+---
+title: "Monatizing multiple datasets"
+output:
+  html_notebook:
+      toc: true
+      toc_depth: 4
+---
+
+# Introduction
+For this project, I will not be using the SBAR format and instead generate as many ideas as possible from the given datasets.  The reason being is that if we are drafting concepts for a real world scenario, businesses want a diverse series of options to distribute to various teams to implement.  Having a quick set of options rather than one single one will allow companies to try and fail fast so that they can succeed quicker.
+
+# Recommender System on simple activity
+### Given
+
+* which web pages the person looked at
+* what the person clicked on each page
+* list of products purchased in the past
+
+### Use
+
+* multi-arm bandit to suggest complimentary products to produce that a person has purchased or is looking at.  This can help us determine how complimentary products are to each other.
+
+### Implementation
+
+* Easy of implementation: Easy
+* Data required: Set #3
+* Impact: quick to deploy but may not be accurately tailored to each user.  It can also overfit to cases where users accidentally clicked on a product that they have no interest in.
+
+# Recommender System on complex activity
+### Given
+
+* what	the	person	clicked	on	each	page
+* which web pages the person looked at
+* list of products purchased in the past
+* estimate	of	how	long	the	user’s	eyes	spent	on	each	page	viewed
+
+### Use
+
+* multi-arm bandit to suggest complimentary products to produce that a person has purchased or is looking at.  This can help us determine how complimentary products are to each other.
+
+### Implementation
+
+* Ease of implementation: Medium
+* Data required: Set #3
+* Impact: Including eye tracking can help narrow down exactly what products the user is looking at but glossed past.  It can also include how long a user was really looking at a product to gauge interest giving us a much more detailed view of what to actually recommend.  A user who spent a lot of time looking at a specific product may be on the edge of buying it, but if we can recommend it to them again, humans will draw that correlation and believe it's fate that they must buy it!! =)
+
+# Recommender System based on person type and complex activity
+
+### Given
+
+* college/university attended
+* year of graduation
+* major/majors
+* number of children
+* financial net worth
+* binary variables of interest
+* what	the	person	clicked	on	each	page
+* which web pages the person looked at
+* estimate	of	how	long	the	user’s	eyes	spent	on	each	page	viewed
+* list of products purchased in the past
+
+### Use
+
+* K-means clustering to categorize the buyer into a certain category 
+* Given the result of the categorization, integrate this into the multi-armed bandit process to recommend related products to their purchases and also products that the user categorization is most likely to buy.
+
+### Implementation
+
+* Ease of implementation: Difficult
+* Data required: set #1 and #3
+* Impact: This allows us to make recommendations based on what they have purchased, what they have seen, and also what they have never thought that they need.  For example, if we know that a customer is just out of college and making a decent income, they may be shopping for various kinds of movies and video games.  We can suggest fidget spinners because majority of the students around that age are purchasing this.  We have expanded the availability of products to new target customer audiences.
+
+
+# Seasonal gifts and products
+### Given
+
+* list of products purchased in the past with date of purchase and ship to address
+* list of monthly payment status over the last five years for credit cards, mortgages, rent, utility bills.
+* martial status
+* number of children
+* current city
+* financial net worth
+* year of graduation
+
+### Use
+* ARIMA to determine a customer's spending limit through out the past 5 years
+* Trending to determine if there are consistent addresses that the customer send gifts to every year
+* Multi-bandit arm combined with the spending limit from the ARIMA model and Trending to determine best complimentary products to recommend to customers a week before the possible gift giving days based on their spending budget during that time of the year.
+
+
+### Implementation
+
+* Ease of implementation: Difficult
+* Data required: set #1 #2 #3
+* Impact: This project allows us to determine the best gifts to recommend to the customer based on their budget and time of the year.  This can increase customer loyalty, for example, a son forgets his mother's birthday and the system suggests a simple decorated chocolate box as a gift since it sees that during this time of the year, he's struggling with his bills.  This way, he sees gifts within his price range and gets a reminder of his mother's birthday so he doesn't get a call from his mother crying about how he doesn't care about her.
+
+
+# Targeted campaign
+### Given
+
+* binary variables of interests
+* whether they ever owned real estate
+
+### Use
+
+Multi-armed bandit to provide recommendations on possible interested products for these users.  This multi-armed bandit approach can be manually weighted by the sellers/supplier on your site.
+
+### Implementation
+
+* Ease of implementation: Easy
+* Data required: set #1 #2
+* Impact: This allows for more of a targeted approach to marketing.  If certain sellers on your site want to do an increase in sales, you can offer a service of promoting their products to the right audience based on their interest or whether they own a home for various home products.
