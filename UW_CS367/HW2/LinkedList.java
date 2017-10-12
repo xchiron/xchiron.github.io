@@ -201,7 +201,8 @@ public class LinkedList<E> implements ListADT<E>{
     	}
     
     /**
-     * Reverses the order of the items from pos1 to pos2 the difficult way for homework
+     * Reverses the order of the items from pos1 to pos2 the difficult way for homework.
+     * NOTE: The Double Linked List will have a header node that is null.
      * 
      * @param pos1 The start position of the reversal group
      * @param pos2 The end position of the reversal group
@@ -222,27 +223,26 @@ public class LinkedList<E> implements ListADT<E>{
   	  //  then recursively reverse the remaining sublist
   	  // We stop when the remaining sublist has size 0 or 1
       
-  	  // find the node in pos1
+  	  // Find the node in pos1
       DblListnode<E> pos1node = items.getNext(); // items is the header node so n is the first node in the list
       for (int k = 0; k < pos1; k++) {
     	  pos1node = pos1node.getNext();
       }
       
-      // find the node in pos2
+      // Find the node in pos2
       DblListnode<E> pos2node = items.getNext(); // items is the header node so n is the first node in the list
       for (int j = 0; j < pos2; j++) {
     	  pos2node = pos2node.getNext();
       }
       
-      // establish the previous and next nodes for each except pos2Next
-      // this is in case pos2 is the last position in the list
+      // Establish the previous and next nodes for each except pos2Next
+      //  this is in case pos2 is the last position in the list
       DblListnode<E> pos1Prev = pos1node.getPrev();
       DblListnode<E> pos1Next = pos1node.getNext();
       DblListnode<E> pos2Prev = pos2node.getPrev();
       
-      // If pos2node is the last node, swap the points and establish pos1node as lastNode
-      // pos1node will not have a linkage out to a next position
-      //if (pos2node == lastNodej) {
+      // If pos2 is the last node, swap pos1 and pos2 linkages with the exception that 
+      //  pos1node will not have a linkage out to a next position
       if (pos2 == numItems-1) {
     	  if (pos1node.getNext() == pos2node) {
     		  pos1node.setNext(null);
