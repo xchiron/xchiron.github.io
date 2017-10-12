@@ -119,9 +119,11 @@ public class LinkedList<E> implements ListADT<E>{
             throw new IndexOutOfBoundsException();
         }
     	
+    	/*
     	if (pos == numItems-1) {
     		return lastNode.getData();
         }
+    	*/
     	
     	DblListnode<E> n = items.getNext();
         for (int k = 0; k < pos; k++) {
@@ -215,7 +217,7 @@ public class LinkedList<E> implements ListADT<E>{
       if (pos1 < 0 || pos1 > numItems-1 || pos2 < 0 || pos2 > numItems-1) {
          throw new IndexOutOfBoundsException();
       }				
-      
+            
       // We swap the 1st and last items in the sublist,
   	  //  then recursively reverse the remaining sublist
   	  // We stop when the remaining sublist has size 0 or 1
@@ -240,16 +242,17 @@ public class LinkedList<E> implements ListADT<E>{
       
       // If pos2node is the last node, swap the points and establish pos1node as lastNode
       // pos1node will not have a linkage out to a next position
-      if (pos2node == lastNode) {
+      //if (pos2node == lastNodej) {
+      if (pos2 == numItems-1) {
     	  if (pos1node.getNext() == pos2node) {
-        	  lastNode = pos1node;
+    		  pos1node.setNext(null);
         	  pos1node.setPrev(pos2node);
         	  pos1Prev.setNext(pos2node);
         	  pos2node.setPrev(pos1Prev);
         	  pos2node.setNext(pos1node);
           }
           else {
-        	  lastNode = pos1node;
+        	  pos1node.setNext(null);
         	  pos1node.setPrev(pos2Prev);
               pos2Prev.setNext(pos1node);
               pos2node.setPrev(pos1Prev);
