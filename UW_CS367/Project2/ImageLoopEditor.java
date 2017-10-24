@@ -57,11 +57,17 @@ public class ImageLoopEditor {
     		return EMPTYLOOPSTRING;
     	}
     	
-    	java.io.PrintStream ps;
+    	File saveFile = new File(filename);
+    	if (saveFile.exists()) 
+    	{
+    		return "Warning: file already exists, will be overwritten\n";
+    	}
+    	
+    	PrintStream ps;
     	
     	try
     	{
-    		 ps = new java.io.PrintStream(filename + ".txt");
+    		 ps = new PrintStream(saveFile);
     	}
     	catch (FileNotFoundException ex)
     	{
@@ -81,14 +87,7 @@ public class ImageLoopEditor {
 	    		title = curImage.getTitle();
 	    		imgFilename = curImage.getFile();
 	    		duration = Integer.toString(curImage.getDuration());
-	    		if (k==0)
-	    		{
-	    			ps.print( imgFilename + " " + duration + " \"" + title + "\"");
-	    		}
-	    		else 
-	    		{
-	    			ps.print( "\n" + imgFilename + " " + duration + " \"" + title + "\"");
-	    		}
+	    		ps.println( imgFilename + " " + duration + " \"" + title + "\"");
 	    	}
 	    	catch (EmptyLoopException ex)
 			{
@@ -99,6 +98,7 @@ public class ImageLoopEditor {
 	    	{
 	    		ps.flush();
 	    	}
+	    	loop.previous();
 	    	
 	    }
 	    
@@ -117,7 +117,17 @@ public class ImageLoopEditor {
         	Scanner fileIn = new Scanner(srcFile);
         	while (fileIn.hasNext()) {
         		String line = fileIn.nextLine();
-        		String[] Ary = line.split(" ");
+        		String cleanLine;
+        		
+        		if(line.contains("\"")) {
+        			cleanLine = line.replace("\"", "");
+        		}
+        		else
+        		{
+        			cleanLine=line;
+        		}
+        		
+        		String[] Ary = cleanLine.split(" ");
         		
         		String imgFilename = Ary[0];
         		String duration = Ary[1];
@@ -220,7 +230,7 @@ public class ImageLoopEditor {
     	}
     	catch (NumberFormatException ex)
     	{
-    		return "invalid jump count\n";
+    		return "invalid jump count \n";
     	}
     	
     	if (intCount == 0)
