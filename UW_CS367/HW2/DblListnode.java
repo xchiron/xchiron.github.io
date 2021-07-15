@@ -1,5 +1,5 @@
 public class DblListnode<E> {
-  //*** fields ***
+  //*** fields ********
     private DblListnode<E> prev;
     private E data;
     private DblListnode<E> next;
